@@ -1,0 +1,71 @@
+BasedOnStyle: LLVM
+
+# Indentation
+UseTab: Never
+IndentWidth: 4
+TabWidth: 4
+
+# Line length
+ColumnLimit: 120
+
+# Language
+Standard: c++20
+
+# Braces
+BreakBeforeBraces: Allman
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterEnum: true
+  AfterFunction: true
+  AfterControlStatement: true
+  AfterNamespace: true
+  BeforeCatch: true
+  BeforeElse: true
+
+# Pointers / references
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+# Short statements
+AllowShortBlocksOnASingleLine: Always
+AllowShortEnumsOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Arguments / parameters
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+
+# Spaces
+SpaceBeforeCpp11BracedList: true
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: true
+SpacesInParentheses: false
+SpacesInAngles: false
+SpaceInEmptyParentheses: false
+SpacesInContainerLiterals: true
+
+# Required for designated initializers:
+# FHitResult Hit{ .bBlockingHit = true };
+SpaceBeforeAssignmentOperators: true
+Cpp11BracedListStyle: true
+
+# Includes
+SortIncludes: false
+IncludeBlocks: Preserve
+
+# Access modifiers
+AccessModifierOffset: -4
+IndentAccessModifiers: false
+
+# Switch / namespaces
+IndentCaseLabels: true
+NamespaceIndentation: None
+FixNamespaceComments: false
+
+# Comments
+ReflowComments: false
