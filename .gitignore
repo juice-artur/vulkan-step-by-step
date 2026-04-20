@@ -1,38 +1,5 @@
-/build
-/bin
-/cmake-build-debug
-/.idea
-# Prerequisites
-*.d
+**/_out/*
+**/.vscode/*
+.DS_Store
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Compiled shaders
-*.spv
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+src/build/**
