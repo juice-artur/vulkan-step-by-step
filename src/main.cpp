@@ -105,6 +105,7 @@ private:
     vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
     vk::raii::SurfaceKHR surface = nullptr;
     vk::raii::PhysicalDevice physicalDevice = nullptr;
+    vk::SampleCountFlagBits msaaSamples = vk::SampleCountFlagBits::e1;
     vk::raii::Device device = nullptr;
     uint32_t queueIndex = ~0;
     vk::raii::Queue queue = nullptr;
@@ -117,6 +118,10 @@ private:
     vk::raii::DescriptorSetLayout descriptorSetLayout = nullptr;
     vk::raii::PipelineLayout pipelineLayout = nullptr;
     vk::raii::Pipeline graphicsPipeline = nullptr;
+
+    vk::raii::Image colorImage = nullptr;
+    vk::raii::DeviceMemory colorImageMemory = nullptr;
+    vk::raii::ImageView colorImageView = nullptr;
 
     vk::raii::Image depthImage = nullptr;
     vk::raii::DeviceMemory depthImageMemory = nullptr;
@@ -178,12 +183,14 @@ private:
         setupDebugMessenger();
         createSurface();
         pickPhysicalDevice();
+        msaaSamples = getMaxUsableSampleCount();
         createLogicalDevice();
         createSwapChain();
         createImageViews();
         createDescriptorSetLayout();
         createGraphicsPipeline();
         createCommandPool();
+        createColorResources();
         createDepthResources();
         createTextureImage();
         createTextureImageView();
@@ -237,6 +244,7 @@ private:
         cleanupSwapChain();
         createSwapChain();
         createImageViews();
+        createColorResources();
         createDepthResources();
     }
 
@@ -247,6 +255,7 @@ private:
                                                .pEngineName = "No Engine",
                                                .engineVersion = VK_MAKE_VERSION(1, 0, 0),
                                                .apiVersion = vk::ApiVersion14};
+
         // Get the required layers
         std::vector<char const*> requiredLayers;
         if (enableValidationLayers)
@@ -497,7 +506,7 @@ private:
                                                              .frontFace = vk::FrontFace::eCounterClockwise,
                                                              .depthBiasEnable = vk::False,
                                                              .lineWidth = 1.0f};
-        vk::PipelineMultisampleStateCreateInfo multisampling {.rasterizationSamples = vk::SampleCountFlagBits::e1,
+        vk::PipelineMultisampleStateCreateInfo multisampling {.rasterizationSamples = msaaSamples,
                                                               .sampleShadingEnable = vk::False};
         vk::PipelineDepthStencilStateCreateInfo depthStencil {.depthTestEnable = vk::True,
                                                               .depthWriteEnable = vk::True,
@@ -551,6 +560,23 @@ private:
         commandPool = vk::raii::CommandPool(device, poolInfo);
     }
 
+    void createColorResources()
+    {
+        vk::Format colorFormat = swapChainSurfaceFormat.format;
+
+        createImage(swapChainExtent.width,
+                    swapChainExtent.height,
+                    1,
+                    msaaSamples,
+                    colorFormat,
+                    vk::ImageTiling::eOptimal,
+                    vk::ImageUsageFlagBits::eTransientAttachment | vk::ImageUsageFlagBits::eColorAttachment,
+                    vk::MemoryPropertyFlagBits::eDeviceLocal,
+                    colorImage,
+                    colorImageMemory);
+        colorImageView = createImageView(colorImage, colorFormat, vk::ImageAspectFlagBits::eColor, 1);
+    }
+
     void createDepthResources()
     {
         vk::Format depthFormat = findDepthFormat();
@@ -558,6 +584,7 @@ private:
         createImage(swapChainExtent.width,
                     swapChainExtent.height,
                     1,
+                    msaaSamples,
                     depthFormat,
                     vk::ImageTiling::eOptimal,
                     vk::ImageUsageFlagBits::eDepthStencilAttachment,
@@ -629,6 +656,7 @@ private:
         createImage(texWidth,
                     texHeight,
                     mipLevels,
+                    vk::SampleCountFlagBits::e1,
                     vk::Format::eR8G8B8A8Srgb,
                     vk::ImageTiling::eOptimal,
                     vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst |
@@ -727,6 +755,40 @@ private:
         endSingleTimeCommands(*commandBuffer);
     }
 
+    vk::SampleCountFlagBits getMaxUsableSampleCount()
+    {
+        vk::PhysicalDeviceProperties physicalDeviceProperties = physicalDevice.getProperties();
+
+        vk::SampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts &
+                                      physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+        if (counts & vk::SampleCountFlagBits::e64)
+        {
+            return vk::SampleCountFlagBits::e64;
+        }
+        if (counts & vk::SampleCountFlagBits::e32)
+        {
+            return vk::SampleCountFlagBits::e32;
+        }
+        if (counts & vk::SampleCountFlagBits::e16)
+        {
+            return vk::SampleCountFlagBits::e16;
+        }
+        if (counts & vk::SampleCountFlagBits::e8)
+        {
+            return vk::SampleCountFlagBits::e8;
+        }
+        if (counts & vk::SampleCountFlagBits::e4)
+        {
+            return vk::SampleCountFlagBits::e4;
+        }
+        if (counts & vk::SampleCountFlagBits::e2)
+        {
+            return vk::SampleCountFlagBits::e2;
+        }
+
+        return vk::SampleCountFlagBits::e1;
+    }
+
     void createTextureImageView()
     {
         textureImageView =
@@ -746,9 +808,7 @@ private:
                                            .anisotropyEnable = vk::True,
                                            .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
                                            .compareEnable = vk::False,
-                                           .compareOp = vk::CompareOp::eAlways,
-                                           .minLod = 0.0f,
-                                           .maxLod = vk::LodClampNone};
+                                           .compareOp = vk::CompareOp::eAlways};
         textureSampler = vk::raii::Sampler(device, samplerInfo);
     }
 
@@ -767,6 +827,7 @@ private:
     void createImage(uint32_t width,
                      uint32_t height,
                      uint32_t mipLevels,
+                     vk::SampleCountFlagBits numSamples,
                      vk::Format format,
                      vk::ImageTiling tiling,
                      vk::ImageUsageFlags usage,
@@ -779,7 +840,7 @@ private:
                                        .extent = {width, height, 1},
                                        .mipLevels = mipLevels,
                                        .arrayLayers = 1,
-                                       .samples = vk::SampleCountFlagBits::e1,
+                                       .samples = numSamples,
                                        .tiling = tiling,
                                        .usage = usage,
                                        .sharingMode = vk::SharingMode::eExclusive,
@@ -1091,7 +1152,16 @@ private:
                                 vk::PipelineStageFlagBits2::eColorAttachmentOutput, // srcStage
                                 vk::PipelineStageFlagBits2::eColorAttachmentOutput, // dstStage
                                 vk::ImageAspectFlagBits::eColor);
-        // Transition depth image to depth attachment optimal layout
+        // Transition the multisampled color image to COLOR_ATTACHMENT_OPTIMAL
+        transition_image_layout(*colorImage,
+                                vk::ImageLayout::eUndefined,
+                                vk::ImageLayout::eColorAttachmentOptimal,
+                                vk::AccessFlagBits2::eColorAttachmentWrite,
+                                vk::AccessFlagBits2::eColorAttachmentWrite,
+                                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                                vk::ImageAspectFlagBits::eColor);
+        // Transition the depth image to DEPTH_ATTACHMENT_OPTIMAL
         transition_image_layout(
             *depthImage,
             vk::ImageLayout::eUndefined,
@@ -1105,24 +1175,28 @@ private:
         vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
         vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
 
-        vk::RenderingAttachmentInfo colorAttachmentInfo = {.imageView = swapChainImageViews[imageIndex],
-                                                           .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
-                                                           .loadOp = vk::AttachmentLoadOp::eClear,
-                                                           .storeOp = vk::AttachmentStoreOp::eStore,
-                                                           .clearValue = clearColor};
+        // Color attachment (multisampled) with resolve attachment
+        vk::RenderingAttachmentInfo colorAttachment = {.imageView = colorImageView,
+                                                       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                                                       .resolveMode = vk::ResolveModeFlagBits::eAverage,
+                                                       .resolveImageView = swapChainImageViews[imageIndex],
+                                                       .resolveImageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                                                       .loadOp = vk::AttachmentLoadOp::eClear,
+                                                       .storeOp = vk::AttachmentStoreOp::eStore,
+                                                       .clearValue = clearColor};
 
-        vk::RenderingAttachmentInfo depthAttachmentInfo = {.imageView = depthImageView,
-                                                           .imageLayout =
-                                                               vk::ImageLayout::eDepthStencilAttachmentOptimal,
-                                                           .loadOp = vk::AttachmentLoadOp::eClear,
-                                                           .storeOp = vk::AttachmentStoreOp::eDontCare,
-                                                           .clearValue = clearDepth};
+        // Depth attachment
+        vk::RenderingAttachmentInfo depthAttachment = {.imageView = depthImageView,
+                                                       .imageLayout = vk::ImageLayout::eDepthAttachmentOptimal,
+                                                       .loadOp = vk::AttachmentLoadOp::eClear,
+                                                       .storeOp = vk::AttachmentStoreOp::eDontCare,
+                                                       .clearValue = clearDepth};
 
         vk::RenderingInfo renderingInfo = {.renderArea = {.offset = {0, 0}, .extent = swapChainExtent},
                                            .layerCount = 1,
                                            .colorAttachmentCount = 1,
-                                           .pColorAttachments = &colorAttachmentInfo,
-                                           .pDepthAttachment = &depthAttachmentInfo};
+                                           .pColorAttachments = &colorAttachment,
+                                           .pDepthAttachment = &depthAttachment};
         commandBuffer.beginRendering(renderingInfo);
         commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphicsPipeline);
         commandBuffer.setViewport(0,
@@ -1367,6 +1441,7 @@ private:
     static std::vector<char> readFile(const std::string& filename)
     {
         std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
         if (!file.is_open())
         {
             throw std::runtime_error("failed to open file!");
@@ -1375,6 +1450,7 @@ private:
         file.seekg(0, std::ios::beg);
         file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
         file.close();
+
         return buffer;
     }
 };
